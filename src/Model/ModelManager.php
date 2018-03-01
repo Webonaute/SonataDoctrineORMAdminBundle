@@ -54,6 +54,33 @@ class ModelManager implements ModelManagerInterface, LockInterface
     }
 
     /**
+     * Returns true if simple query without duplicate identifier check (e.g. DISTINCT keyword) is created.
+     *
+     * @return bool
+     */
+    public function isSimpleQueryEnabled()
+    {
+        return $this->simpleQueryEnabled;
+    }
+
+    /**
+     * If set to true, the generated query will not contain any duplicate identifier check (e.g. DISTINCT keyword).
+     * Enabling simple qurery will improve query performance, but can also return duplicate items. It depends on the query and the database schema.
+     * Please enable the simple query only if you are sure that the duplicate identifier check in the query is useless.
+     *
+     * @param bool $simpleQueryEnabled
+     */
+    public function setSimpleQueryEnabled($simpleQueryEnabled)
+    {
+        $this->simpleQueryEnabled = (bool) $simpleQueryEnabled;
+    }
+
+    /**
+     * @var bool
+     */
+    protected $simpleQueryEnabled = false;
+
+    /**
      * @param string $class
      *
      * @return ClassMetadata
@@ -312,7 +339,10 @@ class ModelManager implements ModelManagerInterface, LockInterface
     {
         $repository = $this->getEntityManager($class)->getRepository($class);
 
-        return new ProxyQuery($repository->createQueryBuilder($alias));
+        $proxyQuery = new ProxyQuery($repository->createQueryBuilder($alias));
+        $proxyQuery->setSimpleQueryEnabled($this->isSimpleQueryEnabled());
+
+        return $proxyQuery;
     }
 
     public function executeQuery($query)
@@ -436,7 +466,7 @@ class ModelManager implements ModelManagerInterface, LockInterface
     public function batchDelete($class, ProxyQueryInterface $queryProxy)
     {
         $queryProxy->select('DISTINCT '.current($queryProxy->getRootAliases()));
-
+        $queryProxy->select($this->getQueryDistinct().$queryProxy->getRootAlias());
         try {
             $entityManager = $this->getEntityManager($class);
 
@@ -464,7 +494,7 @@ class ModelManager implements ModelManagerInterface, LockInterface
         $datagrid->buildPager();
         $query = $datagrid->getQuery();
 
-        $query->select('DISTINCT '.current($query->getRootAliases()));
+        $query->select($this->getQueryDistinct().$query->getRootAlias());
         $query->setFirstResult($firstResult);
         $query->setMaxResults($maxResult);
 
@@ -631,5 +661,14 @@ class ModelManager implements ModelManagerInterface, LockInterface
     protected function camelize($property)
     {
         return str_replace(' ', '', ucwords(str_replace('_', ' ', $property)));
+    }
+
+    protected function getQueryDistinct()
+    {
+        if (!$this->isSimpleQueryEnabled()) {
+            return 'DISTINCT ';
+        }
+
+        return '';
     }
 }

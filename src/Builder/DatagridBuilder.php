@@ -25,6 +25,7 @@ use Sonata\DoctrineORMAdminBundle\Datagrid\Pager;
 use Sonata\DoctrineORMAdminBundle\Filter\ModelAutocompleteFilter;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
 use Symfony\Component\Form\FormFactoryInterface;
+use Sonata\DoctrineORMAdminBundle\Datagrid\SimpleQueryPagerInterface;
 
 class DatagridBuilder implements DatagridBuilderInterface
 {
@@ -150,6 +151,10 @@ class DatagridBuilder implements DatagridBuilderInterface
     public function getBaseDatagrid(AdminInterface $admin, array $values = [])
     {
         $pager = $this->getPager($admin->getPagerType());
+
+        if ($pager instanceof SimpleQueryPagerInterface) {
+            $pager->setSimpleQueryEnabled($admin->getModelManager()->isSimpleQueryEnabled());
+        }
 
         $pager->setCountColumn($admin->getModelManager()->getIdentifierFieldNames($admin->getClass()));
 
